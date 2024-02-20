@@ -82,7 +82,7 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
 
   private final Set<DependantChain> flushedDependantChain = new LinkedHashSet<>();
   private final Map<DependantChain, Boolean> mainLogicExecuted = new LinkedHashMap<>();
-
+  // BatchKryon is called from KryonExecutor.
   BatchKryon(
       KryonDefinition kryonDefinition,
       KryonExecutor kryonExecutor,
@@ -94,7 +94,7 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
         kryonDefinition,
         kryonExecutor,
         requestScopedDecoratorsSupplier,
-        logicDecorationOrdering,
+        logicDecorationOrdering, // ordering of decorators.
         requestIdGenerator);
   }
 
@@ -104,7 +104,8 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
     flushAllDependenciesIfNeeded(flushCommand.dependantChain());
     flushDecoratorsIfNeeded(flushCommand.dependantChain());
   }
-
+  // this is the only entrypoint to a Kryon. This is first place where request comes for a Kryon.
+  // You can execute the Kryon using this method only.
   @Override
   public CompletableFuture<BatchResponse> executeCommand(BatchCommand kryonCommand) {
     DependantChain dependantChain = kryonCommand.dependantChain();
@@ -116,11 +117,13 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
       } else if (kryonCommand instanceof CallbackBatch callbackBatch) {
         collectDependencyValues(callbackBatch);
       }
-      triggerDependencies(
+      triggerDependencies( // dependencies are being triggered.
           dependantChain, getTriggerableDependencies(dependantChain, kryonCommand.inputNames()));
 
       Optional<CompletableFuture<BatchResponse>> mainLogicFuture =
-          executeMainLogicIfPossible(dependantChain);
+          executeMainLogicIfPossible(
+              dependantChain); // executing main logic where decorators main logic will also be
+      // executed.
       mainLogicFuture.ifPresent(f -> linkFutures(f, resultForDepChain));
     } catch (Throwable e) {
       resultForDepChain.completeExceptionally(e);
@@ -207,7 +210,10 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
           .map(
               logic -> {
                 return logic.resolve(
-                    triggerableDependencies.entrySet().stream()
+                    triggerableDependencies
+                        .entrySet()
+                        .stream() // triggerableDependencies what all dependencies can be run at
+                        // this point in time.
                         .filter(e -> !e.getValue().isEmpty())
                         .map(e -> new DependencyResolutionRequest(e.getKey(), e.getValue()))
                         .toList(),
@@ -224,7 +230,7 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
     for (var entry : commandsByDependency.entrySet()) {
       String depName = entry.getKey();
       var resolverCommandsForDep = entry.getValue();
-      triggerDependency(
+      triggerDependency( // dependencies are triggered now.
           depName,
           dependantChain,
           resolverCommandsForDep,
@@ -332,7 +338,8 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
                             }
                           }));
 
-          enqueueOrExecuteCommand(
+          enqueueOrExecuteCommand( // this checks whether should I put it into the queue or directly
+              // execute via DFS
               () -> new CallbackBatch(kryonId, depName, results, dependantChain),
               depKryonId,
               kryonDefinition,
@@ -344,7 +351,7 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
   private Optional<CompletableFuture<BatchResponse>> executeMainLogicIfPossible(
       DependantChain dependantChain) {
     ForwardBatch forwardCommand = getForwardCommand(dependantChain);
-    // If all the inputs and dependency values are available, then prepare run mainLogic
+    // If all the inputs and dependency values are available, then prepare run mainLogic//
     ImmutableSet<String> inputNames = kryonDefinition.getMainLogicDefinition().inputNames();
     if (availableInputsByDepChain
         .getOrDefault(dependantChain, ImmutableSet.of())
@@ -371,7 +378,10 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
     }
     CompletableFuture<BatchResponse> resultForBatch = new CompletableFuture<>();
     Map<RequestId, CompletableFuture<ValueOrError<Object>>> results =
-        executeDecoratedMainLogic(mainLogicDefinition, mainLogicInputs, dependantChain);
+        executeDecoratedMainLogic(
+            mainLogicDefinition,
+            mainLogicInputs,
+            dependantChain); // decorators mains logic being executed.
 
     allOf(results.values().toArray(CompletableFuture[]::new))
         .whenComplete(
@@ -396,10 +406,13 @@ final class BatchKryon extends AbstractKryon<BatchCommand, BatchResponse> {
       MainLogicDefinition<Object> mainLogicDefinition,
       Map<RequestId, MainLogicInputs> inputs,
       DependantChain dependantChain) {
-    NavigableSet<MainLogicDecorator> sortedDecorators = getSortedDecorators(dependantChain);
+    NavigableSet<MainLogicDecorator> sortedDecorators =
+        getSortedDecorators(dependantChain); // It gets sorted decorators ie here stitching happens.
     MainLogic<Object> logic = mainLogicDefinition::execute;
 
-    for (MainLogicDecorator mainLogicDecorator : sortedDecorators) {
+    for (MainLogicDecorator mainLogicDecorator :
+        sortedDecorators) { // it iterates through all the decorators and calls the decorateLogic
+      // method.
       logic = mainLogicDecorator.decorateLogic(logic, mainLogicDefinition);
     }
     MainLogic<Object> finalLogic = logic;

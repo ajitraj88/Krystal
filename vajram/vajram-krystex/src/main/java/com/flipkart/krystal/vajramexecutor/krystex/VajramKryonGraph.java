@@ -86,6 +86,7 @@ import lombok.Getter;
 import org.checkerframework.checker.initialization.qual.NotOnlyInitialized;
 import org.checkerframework.checker.initialization.qual.UnderInitialization;
 import org.checkerframework.checker.nullness.qual.Nullable;
+// This creates Graph of Kryons from Vajrams.
 
 /** The execution graph encompassing all registered vajrams. */
 public final class VajramKryonGraph implements VajramExecutableGraph {
@@ -130,8 +131,8 @@ public final class VajramKryonGraph implements VajramExecutableGraph {
   public MultiLeasePool<? extends ExecutorService> getExecutorPool() {
     return executorPool;
   }
-
-  @Override
+  // this will create the request object when you pass requestContext
+  @Override // when this createExecutor is called it delegates to Krystal executor.
   public <C extends ApplicationRequestContext> KrystexVajramExecutor<C> createExecutor(
       C requestContext) {
     return createExecutor(requestContext, KryonExecutorConfig.builder().debug(false).build());
@@ -176,7 +177,8 @@ public final class VajramKryonGraph implements VajramExecutableGraph {
                       .decoratorFactory()
                       .apply(new ModulatorContext(vajram, decoratorContext))));
     }
-    mainLogicDefinition.registerRequestScopedDecorator(mainLogicDecoratorConfigList);
+    mainLogicDefinition.registerRequestScopedDecorator(
+        mainLogicDecoratorConfigList); // registering request scoped decorators and not getting it.
   }
 
   /**
@@ -511,7 +513,8 @@ public final class VajramKryonGraph implements VajramExecutableGraph {
     }
     throw new MandatoryInputsMissingException(vajramID, missingMandatoryValues);
   }
-
+  // this fucntion is called during the app startup and session scope decorators are registered here
+  // only.
   private MainLogicDefinition<?> createVajramKryonLogic(
       KryonId kryonId, VajramDefinition vajramDefinition) {
     VajramID vajramId = vajramDefinition.getVajram().getId();

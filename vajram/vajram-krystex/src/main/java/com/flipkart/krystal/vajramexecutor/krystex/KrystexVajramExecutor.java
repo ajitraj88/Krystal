@@ -13,13 +13,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import org.checkerframework.checker.nullness.qual.Nullable;
+// this is a wrapper around VajramExecutor. For every request this is created
 
 public class KrystexVajramExecutor<C extends ApplicationRequestContext>
     implements VajramExecutor<C> {
-
-  private final VajramKryonGraph vajramKryonGraph;
+  // Vajram is the thing which developers write while Kryon is the runtime manifestation of it. So
+  // if in your DAG there are 10 vajrams, 10 Kryons are created for it and that is what is executed.
+  private final VajramKryonGraph
+      vajramKryonGraph; // this is created at the start of the application lifesycle. This is the
+  // specific implementation of VajramExecutableGraph. This loads all the
+  // Vajrams in memory and creates a DAG.
   private final C applicationRequestContext;
-  private final KrystalExecutor krystalExecutor;
+  private final KrystalExecutor krystalExecutor; // this is inside Krystal library.
 
   public KrystexVajramExecutor(
       VajramKryonGraph vajramKryonGraph,
@@ -49,7 +54,7 @@ public class KrystexVajramExecutor<C extends ApplicationRequestContext>
       VajramID vajramId,
       Function<C, VajramRequest> vajramRequestBuilder,
       KryonExecutionConfig executionConfig) {
-    return krystalExecutor.executeKryon(
+    return krystalExecutor.executeKryon( // now this calls krystalExecutor executeKryon fn.
         vajramKryonGraph.getKryonId(vajramId),
         vajramRequestBuilder.apply(applicationRequestContext).toInputValues(),
         executionConfig);

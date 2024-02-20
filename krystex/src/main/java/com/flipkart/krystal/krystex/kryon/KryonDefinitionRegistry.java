@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.Nullable;
+// tells about all vajrams dependencies.
 
 public final class KryonDefinitionRegistry {
 

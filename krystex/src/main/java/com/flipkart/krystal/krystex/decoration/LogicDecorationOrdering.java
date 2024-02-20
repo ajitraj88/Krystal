@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
+// decides the order of decorators ordering.
 
 @EqualsAndHashCode(cacheStrategy = LAZY)
 public class LogicDecorationOrdering {
@@ -19,7 +20,9 @@ public class LogicDecorationOrdering {
       new LogicDecorationOrdering(ImmutableSet.of());
 
   private final ImmutableMap<String, Integer> decoratorTypeIndices;
-
+  // If there is no order, then ordering doesn't matter.
+  // Ordering is just a list of decorators and the order in which you gave in that order they will
+  // be applied.
   public LogicDecorationOrdering(ImmutableSet<String> orderedDecoratorIds) {
     List<String> strings = orderedDecoratorIds.stream().toList();
     Map<String, Integer> indices = new HashMap<>();

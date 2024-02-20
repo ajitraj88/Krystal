@@ -12,6 +12,7 @@ import com.flipkart.krystal.krystex.kryon.KryonLogicId;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -49,7 +50,9 @@ public final class DefaultKryonExecutionReport implements KryonExecutionReport {
       KryonId kryonId, KryonLogicId kryonLogicId, ImmutableList<Inputs> inputs) {
     KryonExecution kryonExecution =
         new KryonExecution(
-            kryonId, inputs.stream().map(this::extractAndConvertInputs).collect(toImmutableList()));
+            kryonId,
+            sha256Hash(
+                inputs.stream().map(this::extractAndConvertInputs).collect(toImmutableList())));
     if (mainLogicExecInfos.containsKey(kryonExecution)) {
       log.error("Cannot start the same kryon execution multiple times: {}", kryonExecution);
       return;
@@ -66,9 +69,10 @@ public final class DefaultKryonExecutionReport implements KryonExecutionReport {
     KryonExecution kryonExecution =
         new KryonExecution(
             kryonId,
-            result.values().keySet().stream()
-                .map(this::extractAndConvertInputs)
-                .collect(toImmutableList()));
+            sha256Hash(
+                result.values().keySet().stream()
+                    .map(this::extractAndConvertInputs)
+                    .collect(toImmutableList())));
     LogicExecInfo logicExecInfo = mainLogicExecInfos.get(kryonExecution);
     if (logicExecInfo == null) {
       log.error(
@@ -84,8 +88,7 @@ public final class DefaultKryonExecutionReport implements KryonExecutionReport {
     logicExecInfo.setResult(convertResult(result));
   }
 
-  private record KryonExecution(
-      KryonId kryonId, ImmutableList<ImmutableMap<String, Object>> inputs) {
+  private record KryonExecution(KryonId kryonId, String inputs) {
     @Override
     public String toString() {
       return "%s(%s)".formatted(kryonId.value(), inputs);
@@ -134,6 +137,34 @@ public final class DefaultKryonExecutionReport implements KryonExecutionReport {
         .collect(
             Collectors.toMap(
                 e -> extractAndConvertInputs(e.getKey()), e -> convertValueOrError(e.getValue())));
+  }
+
+  private static String sha256Hash(ImmutableList<ImmutableMap<String, Object>> list) {
+    MessageDigest md = null;
+    try {
+      md = MessageDigest.getInstance("SHA-256");
+    } catch (Exception e) {
+      log.error("Error came while generating message digest instance.");
+    }
+    StringBuilder concatenatedString = new StringBuilder();
+
+    for (ImmutableMap<String, Object> map : list) {
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        concatenatedString.append(entry.getKey()).append(entry.getValue());
+      }
+    }
+
+    if (md != null) {
+      byte[] messageDigest = md.digest(concatenatedString.toString().getBytes());
+      StringBuilder hexString = new StringBuilder();
+
+      for (byte b : messageDigest) {
+        hexString.append(String.format("%02x", b));
+      }
+
+      return hexString.toString();
+    }
+    return "";
   }
 
   @ToString

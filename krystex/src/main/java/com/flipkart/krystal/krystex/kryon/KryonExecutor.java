@@ -86,7 +86,8 @@ public final class KryonExecutor implements KrystalExecutor {
               MainLogicDecorator>>
       requestScopedMainDecorators = new LinkedHashMap<>();
 
-  private final KryonRegistry<?> kryonRegistry = new KryonRegistry<>();
+  private final KryonRegistry<?> kryonRegistry =
+      new KryonRegistry<>(); // all these Kryons which are created will be stored in Kryon registry.
   private final KryonExecutorMetrics kryonMetrics;
   private volatile boolean closed;
   private final Map<RequestId, KryonExecution> allExecutions = new LinkedHashMap<>();
@@ -167,9 +168,14 @@ public final class KryonExecutor implements KrystalExecutor {
     checkArgument(executionId != null, "executionConfig.executionId can not be null");
     RequestId requestId =
         preferredReqGenerator.newRequest("%s:%s".formatted(instanceId, executionId));
-
+    // So execution doesn't start immediately it is put into queue and future is returned. So you
+    // can execute 100s of vajrams. Kryon which you have reuqested to execute is first enqueued.
+    // Every KryonExecutor has a in-memory queue. For every request it's created. It takes your
+    // request and puts it
     //noinspection RedundantCast: This is to avoid nullChecker failing compilation.
-    return enqueueCommand(
+    return enqueueCommand( // This is not communicating with the Kryons insted it is putting
+            // everything in local hashMap. At this point nothing is executed only
+            // graph is there
             // Perform all datastructure manipulations in the command queue to avoid multi-thread
             // access
             (Supplier<CompletableFuture<@Nullable T>>)
@@ -196,11 +202,12 @@ public final class KryonExecutor implements KrystalExecutor {
 
   private void createDependencyKryons(
       KryonId kryonId, DependantChain dependantChain, KryonExecutionConfig executionConfig) {
-    KryonDefinition kryonDefinition = kryonDefinitionRegistry.get(kryonId);
+    KryonDefinition kryonDefinition =
+        kryonDefinitionRegistry.get(kryonId); // this will have every static info about Kryon
     // If a dependantChain is disabled, don't create that kryon and its dependency kryons
     if (!union(executorConfig.disabledDependantChains(), executionConfig.disabledDependantChains())
-        .contains(dependantChain)) {
-      createKryonIfAbsent(kryonId, kryonDefinition);
+        .contains(dependantChain)) { // checking if dependency is disabled or not.
+      createKryonIfAbsent(kryonId, kryonDefinition); // Kryon is being created
       ImmutableMap<String, KryonId> dependencyKryons = kryonDefinition.dependencyKryons();
       dependencyKryons.forEach(
           (dependencyName, depKryonId) ->
@@ -226,15 +233,17 @@ public final class KryonExecutor implements KrystalExecutor {
                       executorConfig.logicDecorationOrdering()));
     } else {
       KryonRegistry<BatchKryon> batchKryonRegistry = (KryonRegistry<BatchKryon>) kryonRegistry;
-      batchKryonRegistry.createIfAbsent(
-          kryonId,
-          _n ->
-              new BatchKryon(
-                  kryonDefinition,
-                  this,
-                  this::getRequestScopedDecorators,
-                  executorConfig.logicDecorationOrdering(),
-                  preferredReqGenerator));
+      batchKryonRegistry
+          .createIfAbsent( // batch Kryon is being created for the given definition and all these
+              // Kryons will be stored in Kryon registry.
+              kryonId,
+              _n ->
+                  new BatchKryon(
+                      kryonDefinition,
+                      this,
+                      this::getRequestScopedDecorators, // it is requestScopedDecoratorsSupplier
+                      executorConfig.logicDecorationOrdering(),
+                      preferredReqGenerator));
     }
   }
 
@@ -435,9 +444,22 @@ public final class KryonExecutor implements KrystalExecutor {
     if (closed) {
       return;
     }
-    this.closed = true;
-    flush();
-    enqueueCommand(
+    this.closed =
+        true; // firstly data will flow then V1 will call flush on V2 and so on. V1 will not flush
+    // V3 until V2 responds.
+    flush(); // First flush is done then iteration through all pending exections and put them into
+    // the execution queue. Once flush is done no more requests will come. So now all the
+    // batching and all can be done. After executing you can flush more as well. This flush
+    // command can be listened by decorators as well. When flush is given then only vajram
+    // will execute. Sp when batching decorator receives flush from both V$ and V3 then
+    // only it does the batching
+    enqueueCommand( // this command means to V2 it is giving command object ie putting it in a
+        // queue. There is a consumer which reads command from the queue and sends it to
+        // the V2. Then V2 will see for this I have to run 2 resolvers ie V5 and V6, so
+        // it will run both of them and enqueue 2 commands, 1 for V5 and 1 for V6.
+        // Command enquing is basically communication between vajrams. Flush is the
+        // control command. Flush is just saying taht this path is done. Enqueue happens
+        // during flush only.
         () ->
             allOf(
                     allExecutions.values().stream()

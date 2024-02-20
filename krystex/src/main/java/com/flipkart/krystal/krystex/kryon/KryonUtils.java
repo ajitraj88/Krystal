@@ -29,9 +29,14 @@ public final class KryonUtils {
     MainLogicDefinition<Object> depMainLogic =
         kryonDefinition.kryonDefinitionRegistry().get(depKryonId).getMainLogicDefinition();
     if (depMainLogic instanceof IOLogicDefinition<Object>) {
-      kryonExecutor.enqueueKryonCommand(commandGenerator);
+      kryonExecutor.enqueueKryonCommand(
+          commandGenerator); // this does the same ie kryonExecutor.enqueueKryonCommand ie here
+      // dependent vajrams are being run.
     } else if (depMainLogic instanceof ComputeLogicDefinition<Object>) {
-      kryonExecutor.executeCommand(commandGenerator.get());
+      kryonExecutor.executeCommand(
+          commandGenerator
+              .get()); // Vajram V1 can talk to V2 without putting into the Queue via execute where
+      // DFS is done.
     } else {
       throw new UnsupportedOperationException(
           "Unknown logicDefinition type %s".formatted(depMainLogic.getClass()));

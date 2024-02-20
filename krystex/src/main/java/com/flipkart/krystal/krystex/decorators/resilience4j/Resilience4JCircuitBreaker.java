@@ -28,15 +28,17 @@ public final class Resilience4JCircuitBreaker implements MainLogicDecorator {
     this.instanceId = instanceId;
   }
 
-  @Override
+  @Override // this input param logicToDecorate is a wrapped logic of main logic and other
+  // decorators
   public MainLogic<Object> decorateLogic(
       MainLogic<Object> logicToDecorate, MainLogicDefinition<Object> originalLogicDefinition) {
     CircuitBreaker circuitBreaker = this.circuitBreaker;
     if (circuitBreaker != null) {
-      return inputsList ->
-          extractResponseMap(
+      return inputsList -> // this is the lambda.
+      extractResponseMap(
               inputsList,
-              decorateAsyncExecute(logicToDecorate, inputsList)
+              decorateAsyncExecute(
+                      logicToDecorate, inputsList) // this all is Resilience 4J utility.
                   .withCircuitBreaker(circuitBreaker)
                   .get());
     } else {

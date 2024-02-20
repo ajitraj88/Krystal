@@ -48,7 +48,7 @@ public abstract sealed class MainLogicDefinition<T> extends LogicDefinition<Main
 
   private final Map<String, Map<String, MainLogicDecorator>> sessionScopedDecorators =
       new LinkedHashMap<>();
-
+  // returns SessionScopedLogicDecorators
   public ImmutableMap<String, MainLogicDecorator> getSessionScopedLogicDecorators(
       KryonDefinition kryonDefinition, DependantChain dependants) {
     Map<String, MainLogicDecorator> decorators = new LinkedHashMap<>();
@@ -62,7 +62,10 @@ public abstract sealed class MainLogicDefinition<T> extends LogicDefinition<Main
                   kryonDefinition.kryonDefinitionRegistry());
           String instanceId = decoratorConfig.instanceIdGenerator().apply(logicExecutionContext);
 
-          if (decoratorConfig.shouldDecorate().test(logicExecutionContext)) {
+          if (decoratorConfig
+              .shouldDecorate()
+              .test(logicExecutionContext)) { // shouldDecorate checks whether decorator should be
+            // applied or not.
             decorators.put(
                 s,
                 sessionScopedDecorators
@@ -77,7 +80,7 @@ public abstract sealed class MainLogicDefinition<T> extends LogicDefinition<Main
         });
     return ImmutableMap.copyOf(decorators);
   }
-
+  // request scoped logic decorators
   public void registerRequestScopedDecorator(
       Collection<MainLogicDecoratorConfig> decoratorConfigs) {
     //noinspection UnstableApiUsage

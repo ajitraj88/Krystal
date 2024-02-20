@@ -34,21 +34,34 @@ class FormulaTest {
 
   @BeforeEach
   void setUp() {
-    graph = loadFromClasspath("com.flipkart.krystal.vajram.samples.benchmarks.calculator");
+    graph =
+        loadFromClasspath(
+            "com.flipkart.krystal.vajram.samples.benchmarks.calculator"); // this will happen only
+    // once in the whole
+    // appliation logic.
     Adder.CALL_COUNTER.reset();
   }
 
   @Test
   void formula_success() throws Exception {
     CompletableFuture<Integer> future;
-    VajramKryonGraph graph = this.graph.build();
-    graph.registerInputModulators(
+    VajramKryonGraph graph = this.graph.build(); // this will happen once only as well.
+    graph.registerInputModulators( // registering the batchers.
         vajramID(getVajramIdString(Adder.class)),
         InputModulatorConfig.simple(() -> new Batcher<>(100)));
-    try (KrystexVajramExecutor<FormulaRequestContext> krystexVajramExecutor =
-        graph.createExecutor(new FormulaRequestContext(100, 20, 5, "formulaTest"))) {
+    try (KrystexVajramExecutor<FormulaRequestContext>
+        krystexVajramExecutor = // this is the part which runs again and again per request. One
+            // executor runs for the lifecyle of 1 request. When request comes
+            // first time to the Asgrad we will create 1 executor
+            graph.createExecutor(
+                new FormulaRequestContext(
+                    100,
+                    20,
+                    5,
+                    "formulaTest"))) { // this FormulaRequestContext will be PPRequestContext for
+      // Astra.
       future = executeVajram(krystexVajramExecutor, 0);
-    }
+    } // We will call krystexVajramExecutor.execute it will internally call KryonExecutor
     assertThat(future.get()).isEqualTo(4);
     assertThat(Adder.CALL_COUNTER.sum()).isEqualTo(1);
   }
@@ -207,9 +220,16 @@ class FormulaTest {
   private static CompletableFuture<Integer> executeVajram(
       KrystexVajramExecutor<FormulaRequestContext> krystexVajramExecutor, int value) {
     return krystexVajramExecutor.execute(
-        vajramID(getVajramIdString(Formula.class)),
-        rc -> FormulaRequest.builder().a(rc.a + value).p(rc.p + value).q(rc.q + value).build(),
-        KryonExecutionConfig.builder().executionId("formulaTest" + value).build());
+        vajramID(getVajramIdString(Formula.class)), // this vajram is to be executed
+        rc ->
+            FormulaRequest.builder()
+                .a(rc.a + value)
+                .p(rc.p + value)
+                .q(rc.q + value)
+                .build(), // request Context
+        KryonExecutionConfig.builder()
+            .executionId("formulaTest" + value)
+            .build()); // lambda which converts requestContexts to FormulaRequestContext
   }
 
   private static void syncFormula(Integer value) {

@@ -58,12 +58,14 @@ public final class InputModulationDecorator<
     this.isApplicableToDependantChain = isApplicableToDependantChain;
   }
 
-  @Override
+  @Override // so this takes in MainLogic as an input and wraps this in mainLogic and returns it.
   public MainLogic<Object> decorateLogic(
       MainLogic<Object> logicToDecorate, MainLogicDefinition<Object> originalLogicDefinition) {
     inputModulator.onModulation(
         requests -> requests.forEach(request -> modulateInputsList(logicToDecorate, request)));
-    return inputsList -> {
+    return inputsList -> { // so inside this you can write your decorator and ask it to do whatever
+      // you want. So for caching you will check cache.get if presnt return it
+      // else execute the internal thing.
       List<UnmodulatedInput<I, C>> requests = inputsList.stream().map(inputsConverter).toList();
       List<ModulatedInput<I, C>> modulatedInputs =
           requests.stream()
